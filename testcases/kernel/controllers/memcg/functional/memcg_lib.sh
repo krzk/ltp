@@ -63,6 +63,50 @@ memcg_require_hierarchy_disabled()
 	fi
 }
 
+# Kernel memory allocated for the process is also charged.  It might depend on
+# the number of CPUs and number of nodes. For example on kernel v5.11
+# additionally total_cpus (plus 1 or 2) pages are charged to the group via
+# kernel memory.  For a two-node machine, additional 108 pages kernel memory
+# are charged to the group.
+#
+# Adjust the limit to account such per-CPU and per-node kernel memory.
+# $1 - variable name with limit to adjust
+memcg_adjust_limit_for_kmem()
+{
+	[ $# -ne 1 ] && tst_brk TBROK "memcg_adjust_limit_for_kmem expects 1 parameter"
+	eval "local _limit=\$$1"
+
+	# Total number of CPUs
+	local total_cpus=`tst_ncpus`
+
+	# Get the number of NODES
+	if [ -f "/sys/devices/system/node/has_high_memory" ]; then
+		local mem_string="`cat /sys/devices/system/node/has_high_memory`"
+	else
+		local mem_string="`cat /sys/devices/system/node/has_normal_memory`"
+	fi
+
+	local total_nodes="`echo $mem_string | tr ',' ' '`"
+	local count=0
+	for item in $total_nodes; do
+		local delta=1
+		if [ "${item#*-*}" != "$item" ]; then
+			delta=$((${item#*-*} - ${item%*-*} + 1))
+		fi
+		count=$((count + $delta))
+	done
+	total_nodes=$count
+	# Additional nodes impose charging the kmem, not having regular one node
+	local node_mem=0
+	if [ $total_nodes -gt 1 ]; then
+		node_mem=$((total_nodes - 1))
+		node_mem=$((node_mem * PAGESIZE * 128))
+	fi
+
+	eval "$1='$((_limit + 4 * PAGESIZE + total_cpus * PAGESIZE + node_mem))'"
+	return 0
+}
+
 memcg_setup()
 {
 	if ! is_cgroup_subsystem_available_and_enabled "memory"; then
