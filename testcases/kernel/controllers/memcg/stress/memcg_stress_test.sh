@@ -35,7 +35,7 @@ setup()
 
 	MEM=$(( $mem_free + $swap_free / 2 ))
 	MEM=$(( $MEM / 1024 ))
-	RUN_TIME=$(( 15 * 60 ))
+	RUN_TIME=$(( 5 * 1 ))
 	[ "$pgsize" = "4096" ] && THREAD_SPARE_MB=1 || THREAD_SPARE_MB=8
 
 	tst_res TINFO "Calculated available memory $MEM MB"
