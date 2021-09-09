@@ -64,6 +64,23 @@ void read_alarm_test(void)
 	unsigned long data;
 	fd_set rfds;
 	struct timeval tv;
+	unsigned int alarm_sec = 5;
+
+	if (tst_is_virt(VIRT_HYPERV)) {
+		/*
+		 * Microsoft Hyper-V hypervisor has broken CMOS RTC which
+		 * does not generate interrupts if alarm is set for 5-59
+		 * seconds from now and it advances to next the minute
+		 * (e.g. 10:12:57 -> 10:13:02).
+		 * However alarm set to fire in 60 seconds (and more) works
+		 * fine.
+		 *
+		 * This was confirmed on different Linux kernels (from v4.15 up
+		 * to v5.14.2) and instances (Standard_B1ms, Standard_B4ms,
+		 * Standard_D4s_v3, Standard_D8d_v4).
+		 */
+		alarm_sec = 60;
+	}
 
 	tst_resm(TINFO, "RTC READ TEST:");
 
@@ -82,8 +99,8 @@ void read_alarm_test(void)
 
 	tst_resm(TINFO, "RTC ALARM TEST :");
 
-	/* Set Alarm to 5 Seconds */
-	rtc_tm.tm_sec += 5;
+	/* Set Alarm to 5 (or more) seconds */
+	rtc_tm.tm_sec += alarm_sec;
 	if (rtc_tm.tm_sec >= 60) {
 		rtc_tm.tm_sec %= 60;
 		rtc_tm.tm_min++;
@@ -127,9 +144,9 @@ void read_alarm_test(void)
 		return;
 	}
 
-	tst_resm(TINFO, "Waiting 5 seconds for the alarm...");
+	tst_resm(TINFO, "Waiting %u seconds for the alarm...", alarm_sec+1);
 
-	tv.tv_sec = 6;		/* set 6 seconds as the time out */
+	tv.tv_sec = alarm_sec+1;		/* set 5+1 seconds as the time out */
 	tv.tv_usec = 0;
 
 	FD_ZERO(&rfds);
